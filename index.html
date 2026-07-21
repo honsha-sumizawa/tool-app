@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.1</title>
+  <title>工具管理 Ver4.2</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -36,14 +36,40 @@
       position: relative;
       border: 3px solid #2ecc71;
     }
-    #video {
+    #video-wrapper {
+      position: relative;
       width: 100%;
       height: 260px;
+      overflow: hidden;
+    }
+    #video {
+      width: 100%;
+      height: 100%;
       object-fit: cover;
       display: block;
+      transform-origin: center center;
+      transition: transform 0.1s ease;
     }
 
-    /* ガイド枠（ゆったり広め） */
+    /* ズームスライダーコントロール */
+    .zoom-control-box {
+      background: #111;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
+    .zoom-slider {
+      flex: 1;
+      height: 6px;
+      accent-color: #2ecc71;
+      cursor: pointer;
+    }
+
+    /* ガイド枠 */
     .scan-overlay {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 260px;
@@ -117,7 +143,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.1</h2>
+  <h2>工具管理 Ver4.2</h2>
   
   <!-- 2つのカメラ選択ボタン -->
   <div class="camera-btn-group">
@@ -126,19 +152,26 @@
     </button>
     <label class="btn-camera-native">
       📸 標準カメラ撮影
-      <!-- スマホ標準カメラを直接起動するピント確実なinputタグ -->
       <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleNativeCamera(this)">
     </label>
   </div>
   
   <!-- スキャナーガイド枠付き動画カメラ領域 -->
   <div id="camera-area">
-    <video id="video" autoplay playsinline></video>
-    <div class="scan-overlay">
-      <div class="scan-guide-box">
-        <div class="scan-line"></div>
+    <div id="video-wrapper">
+      <video id="video" autoplay playsinline></video>
+      <div class="scan-overlay">
+        <div class="scan-guide-box">
+          <div class="scan-line"></div>
+        </div>
+        <div class="scan-tip">離れてズームを上げるとクッキリピントが合います</div>
       </div>
-      <div class="scan-tip">少し離して枠に合わせると自動読み取りされます</div>
+    </div>
+    <!-- ズームコントロールバー -->
+    <div class="zoom-control-box">
+      <span>🔍 ズーム:</span>
+      <input type="range" id="zoom-range" class="zoom-slider" min="1.0" max="4.0" step="0.1" value="1.0" oninput="applyCameraZoom(this.value)">
+      <span id="zoom-val">1.0x</span>
     </div>
     <button type="button" class="btn-snap" onclick="captureLiveImage()">📸 現在のフレームを解析</button>
   </div>
@@ -217,7 +250,7 @@
   // =========================================================================
   // 【重要】ご自身のGASウェブアプリURLをここに貼り付けて設定します！
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbx341EaaWLKKA2DQYMZsYWHYtavTudPzkYwuMGOsKXf0-QfRhs1UD851spzw2jFYyk_rA/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw2e8nOzBo2ce8_7Urqu7iWhxyTtL-jx9r9pYTNnnmVa1kG0Bty_RO89FAAuDEDdszzfA/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -324,7 +357,7 @@
     });
   }
 
-  // スマホ標準カメラでパシャリ撮影された画像の高精細解析ロジック
+  // 標準カメラ撮影の解析ロジック
   function handleNativeCamera(input) {
     if (!input.files || !input.files[0]) return;
     
@@ -340,7 +373,6 @@
         locate: true
       }, function(result) {
         showLoading(false);
-        // 入力フォームクリア（連続撮影対応）
         input.value = "";
         
         if (result && result.codeResult && result.codeResult.code) {
@@ -352,6 +384,32 @@
       });
     };
     reader.readAsDataURL(file);
+  }
+
+  // リアルタイムズーム適用ロジック（カメラ機能・CSSアシスト併用）
+  function applyCameraZoom(val) {
+    document.getElementById('zoom-val').innerText = parseFloat(val).toFixed(1) + "x";
+    const video = document.getElementById('video');
+
+    if (videoStream) {
+      const track = videoStream.getVideoTracks()[0];
+      if (track && typeof track.getCapabilities === 'function') {
+        const capabilities = track.getCapabilities();
+        // スマホカメラレンズの物理ズーム機能が使える場合
+        if (capabilities.zoom) {
+          const minZoom = capabilities.zoom.min || 1.0;
+          const maxZoom = capabilities.zoom.max || 4.0;
+          const targetZoom = Math.min(Math.max(val, minZoom), maxZoom);
+          track.applyConstraints({ advanced: [{ zoom: targetZoom }] }).catch(err => {
+            console.warn("物理ズーム制御制限のためCSSズームを併用します:", err);
+            video.style.transform = `scale(${val})`;
+          });
+          return;
+        }
+      }
+    }
+    // レンズ制御未対応環境でのデジタルズーム（拡大拡大処理）
+    video.style.transform = `scale(${val})`;
   }
 
   // 動画カメラ初期化
@@ -366,8 +424,13 @@
     
     area.style.display = 'block';
     
+    // ズーム初期化
+    document.getElementById('zoom-range').value = 1.0;
+    document.getElementById('zoom-val').innerText = "1.0x";
+    video.style.transform = "scale(1.0)";
+
     const constraintsPrimary = {
-      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: false
     };
 
@@ -442,7 +505,7 @@
         document.getElementById('search-input').value = result.codeResult.code;
         triggerSearch();
       } else {
-        alert("バーコードを認識できませんでした。「📸 標準カメラ撮影」ボタンでの高精度撮影をお試しください。");
+        alert("バーコードを認識できませんでした。「📸 標準カメラ撮影」ボタンでの高精度撮影をお試しくさい。");
       }
     });
   }
