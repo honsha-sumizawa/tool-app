@@ -2,7 +2,8 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>工具管理 Ver3.8</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>工具管理 Ver3.9</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -54,7 +55,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver3.8</h2>
+  <h2>工具管理 Ver3.9</h2>
   
   <!-- バーコード撮影ボタン -->
   <button type="button" class="btn-camera" id="toggle-camera-btn" onclick="initCamera()">
@@ -141,14 +142,14 @@
   // =========================================================================
   // 【重要】ここにGASから取得した「ウェブアプリURL」を貼り付けます！
   // =========================================================================
-  const GAS_API_URL = "XXXXX"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxGCmkX406W07LxFhIXlpMwnE9cR9AVyMp1_bwZU48nmtW9aVxbFvXEMQEBMtRSY59kEg/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
 
   // 汎用外部通信APIハンドラー
   function callGasApi(action, payload, successCallback, failureCallback) {
-    if (GAS_API_URL === "https://script.google.com/macros/s/AKfycbwDnOIWMTuxQPPMDAWs_jAEbTV1T_-XBrW-0aORWd5EV2Amz39RcQUGeUilZ6gAhaVIgA/exec") {
+    if (GAS_API_URL === "https://script.google.com/macros/s/AKfycbxGCmkX406W07LxFhIXlpMwnE9cR9AVyMp1_bwZU48nmtW9aVxbFvXEMQEBMtRSY59kEg/exec") {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         if (action === "search") {
           google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).searchTool(payload);
