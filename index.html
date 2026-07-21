@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver3.9</title>
+  <title>工具管理 Ver4.0</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -21,11 +21,71 @@
     .search-box input { flex: 1; }
     .btn-search { background: #3498db; color: white; border: none; padding: 0 16px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
     
+    /* カメラボタン */
     .btn-camera { width: 100%; background: #2ecc71; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; margin-bottom: 12px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; }
     
-    #camera-area { display: none; margin-bottom: 12px; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
-    #video { width: 100%; height: auto; display: block; }
-    .btn-snap { width: 100%; background: #e74c3c; color: white; border: none; padding: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; }
+    /* カメラ・スキャナー表示エリア（コンパクト最適化） */
+    #camera-area {
+      display: none;
+      margin-bottom: 14px;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      border: 3px solid #2ecc71;
+    }
+    #video {
+      width: 100%;
+      height: 240px;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* プロ仕様スキャナーガイド枠＆赤レーザー走査線 */
+    .scan-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 240px;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .scan-guide-box {
+      width: 80%;
+      height: 100px;
+      border: 2px solid #2ecc71;
+      border-radius: 8px;
+      box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.4);
+      position: relative;
+    }
+    .scan-line {
+      position: absolute;
+      top: 50%;
+      left: 5%;
+      width: 90%;
+      height: 2px;
+      background: #e74c3c;
+      box-shadow: 0 0 8px #e74c3c;
+      animation: scanAnim 2s infinite ease-in-out;
+    }
+    @keyframes scanAnim {
+      0% { top: 15%; }
+      50% { top: 85%; }
+      100% { top: 15%; }
+    }
+    .scan-tip {
+      position: absolute;
+      bottom: 6px;
+      width: 100%;
+      text-align: center;
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: bold;
+      text-shadow: 0 1px 2px #000;
+    }
+
+    .btn-snap { width: 100%; background: #e74c3c; color: white; border: none; padding: 10px; font-size: 0.95rem; font-weight: bold; cursor: pointer; }
 
     #unregistered-panel {
       display: none; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 12px; margin-bottom: 14px;
@@ -55,17 +115,23 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver3.9</h2>
+  <h2>工具管理 Ver4.0</h2>
   
-  <!-- バーコード撮影ボタン -->
+  <!-- バーコードスキャン起動ボタン -->
   <button type="button" class="btn-camera" id="toggle-camera-btn" onclick="initCamera()">
-    📷 バーコードスキャン (カメラ起動)
+    📷 バーコードスキャン (かざすだけ起動)
   </button>
   
-  <!-- 生画像取得カメラエリア -->
+  <!-- スキャナーガイド枠付きカメラ領域 -->
   <div id="camera-area">
     <video id="video" autoplay playsinline></video>
-    <button type="button" class="btn-snap" onclick="captureLiveImage()">📸 写真を撮影して解析</button>
+    <div class="scan-overlay">
+      <div class="scan-guide-box">
+        <div class="scan-line"></div>
+      </div>
+      <div class="scan-tip">枠内にバーコードを合わせると自動でスキャンされます</div>
+    </div>
+    <button type="button" class="btn-snap" onclick="captureLiveImage()">📸 写真撮影で解析 (手動フォールバック)</button>
   </div>
   
   <!-- 未登録JANコードの登録パネル -->
@@ -140,16 +206,16 @@
 
 <script>
   // =========================================================================
-  // 【重要】ここにGASから取得した「ウェブアプリURL」を貼り付けます！
+  // 【重要】ご自身のGASウェブアプリURLをここに貼り付けて設定します！
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxGCmkX406W07LxFhIXlpMwnE9cR9AVyMp1_bwZU48nmtW9aVxbFvXEMQEBMtRSY59kEg/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzbO-7N0jh3ffkdOY7cpp2AlwH20ZXg41QSxoFnFCX1goy1Mqn_6oTjtBqJW5iXkfoa9w/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
 
   // 汎用外部通信APIハンドラー
   function callGasApi(action, payload, successCallback, failureCallback) {
-    if (GAS_API_URL === "https://script.google.com/macros/s/AKfycbxGCmkX406W07LxFhIXlpMwnE9cR9AVyMp1_bwZU48nmtW9aVxbFvXEMQEBMtRSY59kEg/exec") {
+    if (GAS_API_URL === "https://script.google.com/macros/s/AKfycbzbO-7N0jh3ffkdOY7cpp2AlwH20ZXg41QSxoFnFCX1goy1Mqn_6oTjtBqJW5iXkfoa9w/exec") {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         if (action === "search") {
           google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).searchTool(payload);
@@ -262,7 +328,7 @@
     area.style.display = 'block';
     
     const constraintsPrimary = {
-      video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false
     };
 
@@ -295,7 +361,7 @@
 
     startStream(constraintsPrimary)
       .catch(function(err) {
-        console.warn("背面高解像度カメラの起動に失敗。標準へ切り替えます:", err);
+        console.warn("背面カメラの起動に失敗。標準へ切り替えます:", err);
         return startStream(constraintsFallback);
       })
       .catch(function(err) {
