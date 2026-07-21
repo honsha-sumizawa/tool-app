@@ -208,14 +208,14 @@
   // =========================================================================
   // 【重要】ご自身のGASウェブアプリURLをここに貼り付けて設定します！
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzbO-7N0jh3ffkdOY7cpp2AlwH20ZXg41QSxoFnFCX1goy1Mqn_6oTjtBqJW5iXkfoa9w/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyVOJZ06grYI-wf5SAV31RlG6s7g4X5NjHiq_kdHa9Rh1XEjNkjoceEPYqrZS_szhJxmA/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
 
   // 汎用外部通信APIハンドラー
   function callGasApi(action, payload, successCallback, failureCallback) {
-    if (GAS_API_URL === "https://script.google.com/macros/s/AKfycbzbO-7N0jh3ffkdOY7cpp2AlwH20ZXg41QSxoFnFCX1goy1Mqn_6oTjtBqJW5iXkfoa9w/exec") {
+    if (GAS_API_URL === "XXXXX") {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         if (action === "search") {
           google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).searchTool(payload);
