@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.5</title>
+  <title>工具管理 Ver4.6</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -174,7 +174,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.5</h2>
+  <h2>工具管理 Ver4.6</h2>
   
   <!-- 2つのカメラ選択ボタン -->
   <div class="camera-btn-group">
@@ -293,7 +293,7 @@
   // =========================================================================
   // 【重要】ご自身のGASウェブアプリURLをここに貼り付けて設定します！
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxlWKSgltR0RndaNOMvbv9isOqyleGpdJAKB478UFmVsfH1VEE4oG6LRE5dh0F2fzuWGQ/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbykH7qc6gN9m5MZ7z3lSr-zINpqEBiMcqeCZWBiokyQh-M_fPn92DIzk06ud_T0IQ2tUw/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -405,7 +405,8 @@
           statusEl.innerText = "要注文";
           statusEl.className = "info-val status-alert";
         } else {
-          statusEl.innerText = "在庫OK";
+          // 表示テキストを「在庫あり」に更新
+          statusEl.innerText = "在庫あり";
           statusEl.className = "info-val status-ok";
         }
         
