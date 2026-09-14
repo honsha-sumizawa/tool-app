@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.6</title>
+  <title>工具管理 Ver4.7</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -174,7 +174,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.6</h2>
+  <h2>工具管理 Ver4.7</h2>
   
   <!-- 2つのカメラ選択ボタン -->
   <div class="camera-btn-group">
@@ -250,7 +250,7 @@
     <div class="form-group">
       <label>入出庫区分</label>
       <div class="category-toggle">
-        <div id="cat-new" class="category-option active-new" onclick="setCategory('購入')">🛒 購入 (新品)</div>
+        <div id="cat-new" class="category-option active-new" onclick="setCategory('購入')">🛒 新品 (購入)</div>
         <div id="cat-used" class="category-option" onclick="setCategory('中古')">♻ 中古</div>
       </div>
     </div>
@@ -278,6 +278,27 @@
         <option value="上田">上田</option>
       </select>
     </div>
+
+    <!-- 本社工場 使用機械選択エリア -->
+    <div class="form-group">
+      <label for="select-machine">使用機械</label>
+      <select id="select-machine">
+        <option value="指定なし">指定なし</option>
+        <option value="NTX①">NTX①</option>
+        <option value="NTX②">NTX②</option>
+        <option value="XT-8MY">XT-8MY</option>
+        <option value="NLXS">NLXS</option>
+        <option value="NLX">NLX</option>
+        <option value="X-180">X-180</option>
+        <option value="XC-100">XC-100</option>
+        <option value="X-100_1A">X-100_1A</option>
+        <option value="X-100_2A">X-100_2A</option>
+        <option value="X-150_2A">X-150_2A</option>
+        <option value="X-10">X-10</option>
+        <option value="ミニターン">ミニターン</option>
+        <option value="デュラターン">デュラターン</option>
+      </select>
+    </div>
     
     <div class="action-buttons">
       <button type="button" class="btn-action btn-in" onclick="preCheckRegister('入庫')">📥 入庫</button>
@@ -293,7 +314,7 @@
   // =========================================================================
   // 【重要】ご自身のGASウェブアプリURLをここに貼り付けて設定します！
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbykH7qc6gN9m5MZ7z3lSr-zINpqEBiMcqeCZWBiokyQh-M_fPn92DIzk06ud_T0IQ2tUw/exec"; 
+  const GAS_API_URL = "XXXXX"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -405,7 +426,6 @@
           statusEl.innerText = "要注文";
           statusEl.className = "info-val status-alert";
         } else {
-          // 表示テキストを「在庫あり」に更新
           statusEl.innerText = "在庫あり";
           statusEl.className = "info-val status-ok";
         }
@@ -664,6 +684,7 @@
     const inputPriceVal = document.getElementById('input-price').value.trim();
     const qty = document.getElementById('input-qty').value.trim();
     const user = document.getElementById('select-user').value;
+    const machine = document.getElementById('select-machine').value;
     
     if (!qty || Number(qty) <= 0) {
       alert("数量は1以上を入力してください。");
@@ -675,6 +696,7 @@
       partNo: partNo,
       qty: qty,
       user: user,
+      machine: machine,
       price: inputPriceVal,
       category: currentCategory
     };
@@ -713,6 +735,7 @@
     document.getElementById('info-status').className = "info-val";
     document.getElementById('unregistered-panel').style.display = 'none';
     setCategory('購入');
+    document.getElementById('select-machine').value = "指定なし";
     currentMasterPrice = null;
     document.getElementById('search-input').focus();
   }
