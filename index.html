@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.9</title>
+  <title>工具管理 Ver4.10</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -174,7 +174,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.9</h2>
+  <h2>工具管理 Ver4.10</h2>
   
   <!-- 2つのカメラ選択ボタン -->
   <div class="camera-btn-group">
@@ -207,11 +207,11 @@
     <button type="button" class="btn-snap" onclick="captureLiveImage()">📸 現在のフレームを解析</button>
   </div>
   
-  <!-- 未登録JANコードの登録パネル -->
+  <!-- 未登録JAN/EDPコードの登録パネル -->
   <div id="unregistered-panel">
-    <h3>⚠ 未登録JAN/識別コードの登録</h3>
+    <h3>⚠ 未登録JAN/EDPコードの登録</h3>
     <div class="form-group">
-      <label>読み取ったJAN/識別コード</label>
+      <label>読み取ったJAN/EDPコード</label>
       <input type="text" id="link-jan" readonly style="background:#e9ecef;">
     </div>
     <div class="form-group">
@@ -314,7 +314,7 @@
   // =========================================================================
   // 【重要】ご自身のGASウェブアプリURLをここに貼り付けて設定します！
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz32ggA_lLg0ToSWzSp3iFwTwWjZd67aZA-61yI_ZApmL5DfunCxeSkx_QwaHyAQFFKAw/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw7PvNJKmUmoMzQDsg098ZZyBBi3B4i5KgT32tgHslA58OMywTtV_NRd4zedZnlHK1HrA/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -322,25 +322,30 @@
   let qrScanInterval = null;
 
   /**
-   * JANコード誤読判定＆チェックデジット自動検証 (EAN-8 / EAN-13)
+   * JANコード誤読判定（日本のJAN規格 45/49開始かつ 8/13桁の場合のみチェックデジット判定）
    */
-  function isValidEANCode(codeStr) {
-    if (!/^\d{8}$|^\d{13}$/.test(codeStr)) return false;
-    const digits = codeStr.split('').map(Number);
-    const checkDigit = digits.pop();
-    let sum = 0;
+  function isInvalidJANScan(codeStr) {
+    if (!/^\d+$/.test(codeStr)) return false; // 文字列混在はEANチェックを行わない
     
-    if (codeStr.length === 13) {
-      for (let i = 0; i < digits.length; i++) {
-        sum += (i % 2 === 0) ? digits[i] : digits[i] * 3;
+    // 13桁または8桁で日本の国コード45/49から始まる場合のみチェックデジットを検証
+    if ((codeStr.length === 13 || codeStr.length === 8) && (codeStr.startsWith('49') || codeStr.startsWith('45'))) {
+      const digits = codeStr.split('').map(Number);
+      const checkDigit = digits.pop();
+      let sum = 0;
+      
+      if (codeStr.length === 13) {
+        for (let i = 0; i < digits.length; i++) {
+          sum += (i % 2 === 0) ? digits[i] : digits[i] * 3;
+        }
+      } else { // 8 digits
+        for (let i = 0; i < digits.length; i++) {
+          sum += (i % 2 === 0) ? digits[i] * 3 : digits[i];
+        }
       }
-    } else { // 8 digits
-      for (let i = 0; i < digits.length; i++) {
-        sum += (i % 2 === 0) ? digits[i] * 3 : digits[i];
-      }
+      const calc = (10 - (sum % 10)) % 10;
+      return calc !== checkDigit; // チェックデジット不一致なら誤読とみなす
     }
-    const calc = (10 - (sum % 10)) % 10;
-    return calc === checkDigit;
+    return false; // EDP番号等の9桁数値等は通過させる
   }
 
   function setCategory(cat) {
@@ -394,14 +399,14 @@
   }
 
   document.getElementById('search-input').addEventListener('input', function(e) {
-    let val = e.target.value;
+    let val = e.target.value.replace(/ /g, ' ');
     if (val.indexOf("http") !== -1 || val.indexOf("entry.") !== -1) {
       const match = val.match(/entry\.\d+=([^&]+)/);
       if (match && match[1]) {
         try {
-          val = decodeURIComponent(match[1]).trim();
+          val = decodeURIComponent(match[1]).replace(/ /g, ' ').trim();
         } catch(err) {
-          val = match[1].trim();
+          val = match[1].replace(/ /g, ' ').trim();
         }
       }
     } else {
@@ -425,16 +430,16 @@
   }
 
   function triggerSearch() {
-    let keyword = document.getElementById('search-input').value.trim();
+    let keyword = document.getElementById('search-input').value.replace(/ /g, ' ').trim();
     if (!keyword) return;
     
     if (keyword.indexOf("http") !== -1 || keyword.indexOf("entry.") !== -1) {
       const match = keyword.match(/entry\.\d+=([^&]+)/);
       if (match && match[1]) {
         try {
-          keyword = decodeURIComponent(match[1]).trim();
+          keyword = decodeURIComponent(match[1]).replace(/ /g, ' ').trim();
         } catch(err) {
-          keyword = match[1].trim();
+          keyword = match[1].replace(/ /g, ' ').trim();
         }
         document.getElementById('search-input').value = keyword;
       }
@@ -508,7 +513,7 @@
         Quagga.decodeSingle({
           src: e.target.result,
           numOfWorkers: 0,
-          decoder: { readers: ["ean_reader", "ean_8_reader", "code_128_reader"] },
+          decoder: { readers: ["ean_reader", "ean_8_reader", "code_128_reader", "code_39_reader"] },
           locate: true
         }, function(result) {
           showLoading(false);
@@ -516,8 +521,8 @@
           
           if (result && result.codeResult && result.codeResult.code) {
             const rawCode = result.codeResult.code;
-            if (/^\d+$/.test(rawCode) && !isValidEANCode(rawCode)) {
-              alert("バーコードの読み取り精度エラー（誤読）を検出しました。再撮影してください。");
+            if (isInvalidJANScan(rawCode)) {
+              alert("バーコードの誤読を検出しました。再撮影してください。");
               return;
             }
             document.getElementById('search-input').value = rawCode;
@@ -589,7 +594,7 @@
           
           Quagga.init({
             inputStream: { name: "Live", type: "LiveStream", target: video, constraints: constraintsList[index].video },
-            decoder: { readers: ["ean_reader", "ean_8_reader", "code_128_reader"] }
+            decoder: { readers: ["ean_reader", "ean_8_reader", "code_128_reader", "code_39_reader"] }
           }, function(err) {
             if (!err) Quagga.start();
           });
@@ -597,10 +602,7 @@
           Quagga.onDetected(function(res) {
             const code = res.codeResult.code;
             if (code) {
-              // JANコード桁数＆チェックデジット自動判定（誤読判定時は無視して撮影継続）
-              if (/^\d+$/.test(code)) {
-                if (!isValidEANCode(code)) return;
-              }
+              if (isInvalidJANScan(code)) return; // JAN誤読時のみスキャン継続
               stopCamera();
               document.getElementById('search-input').value = code;
               triggerSearch();
@@ -675,14 +677,14 @@
     Quagga.decodeSingle({
       src: dataUrl,
       numOfWorkers: 0,
-      decoder: { readers: ["ean_reader", "ean_8_reader", "code_128_reader"] },
+      decoder: { readers: ["ean_reader", "ean_8_reader", "code_128_reader", "code_39_reader"] },
       locate: true
     }, function(result) {
       showLoading(false);
       if(result && result.codeResult && result.codeResult.code) {
         const rawCode = result.codeResult.code;
-        if (/^\d+$/.test(rawCode) && !isValidEANCode(rawCode)) {
-          alert("バーコードの読み取り精度エラー（誤読）を検出しました。「📸 標準カメラ撮影」でお試しください。");
+        if (isInvalidJANScan(rawCode)) {
+          alert("バーコードの誤読を検出しました。「📸 標準カメラ撮影」でお試しください。");
           return;
         }
         document.getElementById('search-input').value = rawCode;
