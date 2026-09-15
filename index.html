@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.7</title>
+  <title>工具管理 Ver4.9</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -174,7 +174,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.7</h2>
+  <h2>工具管理 Ver4.9</h2>
   
   <!-- 2つのカメラ選択ボタン -->
   <div class="camera-btn-group">
@@ -209,9 +209,9 @@
   
   <!-- 未登録JANコードの登録パネル -->
   <div id="unregistered-panel">
-    <h3>⚠ 未登録JANコードの登録</h3>
+    <h3>⚠ 未登録JAN/識別コードの登録</h3>
     <div class="form-group">
-      <label>読み取ったJAN/コード</label>
+      <label>読み取ったJAN/識別コード</label>
       <input type="text" id="link-jan" readonly style="background:#e9ecef;">
     </div>
     <div class="form-group">
@@ -223,13 +223,13 @@
       <input type="number" id="link-price" placeholder="価格を入力">
     </div>
     <button type="button" class="btn-camera-live" style="background:#e67e22; width:100%;" onclick="submitJanLink()">
-      🔗 この品番にJAN/コードを紐付け登録
+      🔗 この品番にコードを紐付け登録
     </button>
   </div>
   
   <!-- 検索入力エリア -->
   <div class="form-group">
-    <label for="search-input">JAN / 品番 手入力 / QRコード</label>
+    <label for="search-input">JAN / 品番 / EDP / QRコード</label>
     <div class="search-box">
       <input type="text" id="search-input" placeholder="バーコード・QR・手入力" autocomplete="off">
       <button type="button" class="btn-search" onclick="triggerSearch()">検索</button>
@@ -314,12 +314,34 @@
   // =========================================================================
   // 【重要】ご自身のGASウェブアプリURLをここに貼り付けて設定します！
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycby1FJTjp3PYTsCQYeo8kmscSsxs4eJb77cxwE0DsvryaTuTYRBQ478AmjwQySTSoRPdUQ/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz32ggA_lLg0ToSWzSp3iFwTwWjZd67aZA-61yI_ZApmL5DfunCxeSkx_QwaHyAQFFKAw/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
   let currentCategory = "購入";
   let qrScanInterval = null;
+
+  /**
+   * JANコード誤読判定＆チェックデジット自動検証 (EAN-8 / EAN-13)
+   */
+  function isValidEANCode(codeStr) {
+    if (!/^\d{8}$|^\d{13}$/.test(codeStr)) return false;
+    const digits = codeStr.split('').map(Number);
+    const checkDigit = digits.pop();
+    let sum = 0;
+    
+    if (codeStr.length === 13) {
+      for (let i = 0; i < digits.length; i++) {
+        sum += (i % 2 === 0) ? digits[i] : digits[i] * 3;
+      }
+    } else { // 8 digits
+      for (let i = 0; i < digits.length; i++) {
+        sum += (i % 2 === 0) ? digits[i] * 3 : digits[i];
+      }
+    }
+    const calc = (10 - (sum % 10)) % 10;
+    return calc === checkDigit;
+  }
 
   function setCategory(cat) {
     currentCategory = cat;
@@ -374,9 +396,13 @@
   document.getElementById('search-input').addEventListener('input', function(e) {
     let val = e.target.value;
     if (val.indexOf("http") !== -1 || val.indexOf("entry.") !== -1) {
-      const match = val.match(/entry\.\d+=(.+)$/);
+      const match = val.match(/entry\.\d+=([^&]+)/);
       if (match && match[1]) {
-        val = decodeURIComponent(match[1]).trim();
+        try {
+          val = decodeURIComponent(match[1]).trim();
+        } catch(err) {
+          val = match[1].trim();
+        }
       }
     } else {
       val = val.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
@@ -403,9 +429,13 @@
     if (!keyword) return;
     
     if (keyword.indexOf("http") !== -1 || keyword.indexOf("entry.") !== -1) {
-      const match = keyword.match(/entry\.\d+=(.+)$/);
+      const match = keyword.match(/entry\.\d+=([^&]+)/);
       if (match && match[1]) {
-        keyword = decodeURIComponent(match[1]).trim();
+        try {
+          keyword = decodeURIComponent(match[1]).trim();
+        } catch(err) {
+          keyword = match[1].trim();
+        }
         document.getElementById('search-input').value = keyword;
       }
     }
@@ -485,7 +515,12 @@
           input.value = "";
           
           if (result && result.codeResult && result.codeResult.code) {
-            document.getElementById('search-input').value = result.codeResult.code;
+            const rawCode = result.codeResult.code;
+            if (/^\d+$/.test(rawCode) && !isValidEANCode(rawCode)) {
+              alert("バーコードの読み取り精度エラー（誤読）を検出しました。再撮影してください。");
+              return;
+            }
+            document.getElementById('search-input').value = rawCode;
             triggerSearch();
           } else {
             alert("バーコード/QRコードが識別できませんでした。離れた位置からズームして撮影してみてください。");
@@ -562,6 +597,10 @@
           Quagga.onDetected(function(res) {
             const code = res.codeResult.code;
             if (code) {
+              // JANコード桁数＆チェックデジット自動判定（誤読判定時は無視して撮影継続）
+              if (/^\d+$/.test(code)) {
+                if (!isValidEANCode(code)) return;
+              }
               stopCamera();
               document.getElementById('search-input').value = code;
               triggerSearch();
@@ -641,7 +680,12 @@
     }, function(result) {
       showLoading(false);
       if(result && result.codeResult && result.codeResult.code) {
-        document.getElementById('search-input').value = result.codeResult.code;
+        const rawCode = result.codeResult.code;
+        if (/^\d+$/.test(rawCode) && !isValidEANCode(rawCode)) {
+          alert("バーコードの読み取り精度エラー（誤読）を検出しました。「📸 標準カメラ撮影」でお試しください。");
+          return;
+        }
+        document.getElementById('search-input').value = rawCode;
         triggerSearch();
       } else {
         alert("バーコード/QRコードを認識できませんでした。「📸 標準カメラ撮影」をお試しください。");
