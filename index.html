@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.10</title>
+  <title>工具管理 Ver4.11</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -174,7 +174,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.10</h2>
+  <h2>工具管理 Ver4.11</h2>
   
   <!-- 2つのカメラ選択ボタン -->
   <div class="camera-btn-group">
@@ -314,20 +314,21 @@
   // =========================================================================
   // 【重要】ご自身のGASウェブアプリURLをここに貼り付けて設定します！
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw7PvNJKmUmoMzQDsg098ZZyBBi3B4i5KgT32tgHslA58OMywTtV_NRd4zedZnlHK1HrA/exec"; 
+  const GAS_API_URL = "XXXXX"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
   let currentCategory = "購入";
   let qrScanInterval = null;
+  let isApiCalling = false; // 二重送信ガード
+  let isScanProcessing = false; // 重複ダイアログ（アラート）ガード
 
   /**
    * JANコード誤読判定（日本のJAN規格 45/49開始かつ 8/13桁の場合のみチェックデジット判定）
    */
   function isInvalidJANScan(codeStr) {
-    if (!/^\d+$/.test(codeStr)) return false; // 文字列混在はEANチェックを行わない
+    if (!/^\d+$/.test(codeStr)) return false;
     
-    // 13桁または8桁で日本の国コード45/49から始まる場合のみチェックデジットを検証
     if ((codeStr.length === 13 || codeStr.length === 8) && (codeStr.startsWith('49') || codeStr.startsWith('45'))) {
       const digits = codeStr.split('').map(Number);
       const checkDigit = digits.pop();
@@ -337,15 +338,15 @@
         for (let i = 0; i < digits.length; i++) {
           sum += (i % 2 === 0) ? digits[i] : digits[i] * 3;
         }
-      } else { // 8 digits
+      } else {
         for (let i = 0; i < digits.length; i++) {
           sum += (i % 2 === 0) ? digits[i] * 3 : digits[i];
         }
       }
       const calc = (10 - (sum % 10)) % 10;
-      return calc !== checkDigit; // チェックデジット不一致なら誤読とみなす
+      return calc !== checkDigit;
     }
-    return false; // EDP番号等の9桁数値等は通過させる
+    return false;
   }
 
   function setCategory(cat) {
@@ -362,7 +363,10 @@
     }
   }
 
-  function callGasApi(action, payload, successCallback, failureCallback) {
+  /**
+   * 自動リトライ機能付き API 通信関数（TypeError: Load failed 対策）
+   */
+  function callGasApi(action, payload, successCallback, failureCallback, retryCount = 1) {
     if (GAS_API_URL === "XXXXX") {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         if (action === "search") {
@@ -376,6 +380,7 @@
       } else {
         alert("【設定エラー】コード上部の 'GAS_API_URL' にウェブアプリURLを貼り付けてください。");
         showLoading(false);
+        isApiCalling = false;
         return;
       }
     }
@@ -394,8 +399,22 @@
       if (!res.ok) throw new Error("API通信エラーが発生しました。");
       return res.json();
     })
-    .then(data => successCallback(data))
-    .catch(err => failureCallback(err));
+    .then(data => {
+      isApiCalling = false;
+      successCallback(data);
+    })
+    .catch(err => {
+      // TypeError: Load failed や Failed to fetch 発生時は1回だけ自動リトライ
+      if (retryCount > 0 && (err.name === 'TypeError' || err.message.includes('Load failed') || err.message.includes('Failed to fetch'))) {
+        console.warn("通信エラーを検知。1秒後に再試行します...", err);
+        setTimeout(() => {
+          callGasApi(action, payload, successCallback, failureCallback, retryCount - 1);
+        }, 1000);
+      } else {
+        isApiCalling = false;
+        failureCallback(err);
+      }
+    });
   }
 
   document.getElementById('search-input').addEventListener('input', function(e) {
@@ -430,6 +449,8 @@
   }
 
   function triggerSearch() {
+    if (isApiCalling) return;
+    
     let keyword = document.getElementById('search-input').value.replace(/ /g, ' ').trim();
     if (!keyword) return;
     
@@ -445,6 +466,7 @@
       }
     }
     
+    isApiCalling = true;
     showLoading(true);
     document.getElementById('unregistered-panel').style.display = 'none';
     
@@ -471,10 +493,18 @@
         document.getElementById('input-qty').focus();
         document.getElementById('input-qty').select();
       } else if (result.notFound) {
+        // 未登録パネル表示時に前回情報を確実にクリア
         document.getElementById('link-jan').value = result.jan;
+        document.getElementById('link-partno').value = "";
+        document.getElementById('link-price').value = "";
+        
         document.getElementById('unregistered-panel').style.display = 'block';
         document.getElementById('link-partno').focus();
-        alert("入力されたコードはマスタにありません。既存品番との紐付けパネルを起動しました。");
+        
+        // ダイアログは1度のみ表示
+        setTimeout(() => {
+          alert("入力されたコードはマスタにありません。既存品番との紐付けパネルを起動しました。");
+        }, 100);
       } else {
         alert(result.message);
       }
@@ -568,6 +598,7 @@
       return;
     }
     
+    isScanProcessing = false; // フラグリセット
     area.style.display = 'block';
     document.getElementById('zoom-range').value = 1.0;
     document.getElementById('zoom-val').innerText = "1.0x";
@@ -600,9 +631,11 @@
           });
 
           Quagga.onDetected(function(res) {
+            if (isScanProcessing) return;
             const code = res.codeResult.code;
             if (code) {
-              if (isInvalidJANScan(code)) return; // JAN誤読時のみスキャン継続
+              if (isInvalidJANScan(code)) return;
+              isScanProcessing = true; // 即座に重複検知をガード
               stopCamera();
               document.getElementById('search-input').value = code;
               triggerSearch();
@@ -614,6 +647,7 @@
           
           if (qrScanInterval) clearInterval(qrScanInterval);
           qrScanInterval = setInterval(function() {
+            if (isScanProcessing) return;
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
               canvas.width = video.videoWidth;
               canvas.height = video.videoHeight;
@@ -622,6 +656,7 @@
               const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
               
               if (qrCode && qrCode.data) {
+                isScanProcessing = true; // 即座に重複検知をガード
                 stopCamera();
                 document.getElementById('search-input').value = qrCode.data;
                 triggerSearch();
@@ -652,6 +687,7 @@
   }
 
   function captureLiveImage() {
+    if (isScanProcessing) return;
     const video = document.getElementById('video');
     const canvas = document.getElementById('qr-canvas');
     canvas.width = video.videoWidth;
@@ -664,6 +700,7 @@
     const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
     
     if (qrCode && qrCode.data) {
+      isScanProcessing = true;
       stopCamera();
       document.getElementById('search-input').value = qrCode.data;
       triggerSearch();
@@ -696,6 +733,8 @@
   }
 
   function submitJanLink() {
+    if (isApiCalling) return;
+    
     const jan = document.getElementById('link-jan').value.trim();
     const partNo = document.getElementById('link-partno').value.trim();
     const price = document.getElementById('link-price').value.trim();
@@ -705,12 +744,16 @@
       return;
     }
     
+    isApiCalling = true;
     showLoading(true);
     callGasApi("link", { jan: jan, partNo: partNo, price: price }, function(res) {
       showLoading(false);
       alert(res.message);
       if (res.success) {
         document.getElementById('unregistered-panel').style.display = 'none';
+        // 紐付け完了時に入力フィールドを確実に初期化
+        document.getElementById('link-partno').value = "";
+        document.getElementById('link-price').value = "";
         document.getElementById('search-input').value = jan;
         triggerSearch();
       }
@@ -721,6 +764,8 @@
   }
 
   function preCheckRegister(actionType) {
+    if (isApiCalling) return;
+    
     const partNo = document.getElementById('info-partno').innerText;
     if (partNo === "-" || !partNo) {
       alert("工具を検索してから登録してください。");
@@ -757,6 +802,7 @@
   }
 
   function executeRegister(dataObj) {
+    isApiCalling = true;
     showLoading(true);
     callGasApi("register", dataObj, function(result) {
       showLoading(false);
@@ -780,6 +826,11 @@
     document.getElementById('info-status').innerText = "-";
     document.getElementById('info-status').className = "info-val";
     document.getElementById('unregistered-panel').style.display = 'none';
+    
+    // 入力項目の初期化
+    document.getElementById('link-partno').value = "";
+    document.getElementById('link-price').value = "";
+    
     setCategory('購入');
     document.getElementById('select-machine').value = "指定なし";
     currentMasterPrice = null;
