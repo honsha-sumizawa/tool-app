@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.19</title>
+  <title>工具管理 Ver4.20</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -120,7 +120,7 @@
     #unregistered-panel h3 { font-size: 1rem; color: #856404; margin-bottom: 8px; text-align: center; }
     
     .info-card { background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 14px; }
-    .info-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.95rem; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.95rem; }
     .info-row:last-child { border-bottom: none; }
     .info-val { font-weight: bold; color: #2c3e50; }
     
@@ -150,7 +150,7 @@
       display: none;
       padding: 10px;
       background: #fff;
-      max-height: 220px;
+      max-height: 250px;
       overflow-y: auto;
     }
     .warning-item {
@@ -164,6 +164,18 @@
     .warning-item:last-child { border-bottom: none; }
     .tag-alert { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
     .tag-ordering { background: #e67e22; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
+    
+    .btn-change-status {
+      background: #e67e22;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin-left: 6px;
+    }
 
     /* 区分（購入 / 中古）切替トグルUI */
     .category-toggle {
@@ -211,7 +223,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.19</h2>
+  <h2>工具管理 Ver4.20</h2>
   
   <!-- 動画スキャン専用ボタン -->
   <div class="camera-btn-group">
@@ -285,7 +297,13 @@
     <div class="info-row"><span>品番:</span><span id="info-partno" class="info-val">-</span></div>
     <div class="info-row"><span>用途:</span><span id="info-use" class="info-val">-</span></div>
     <div class="info-row"><span>現在庫 / 最低在庫:</span><span><span id="info-stock" class="info-val">-</span> / <span id="info-min">-</span></span></div>
-    <div class="info-row"><span>判定ステータス:</span><span id="info-status" class="info-val">-</span></div>
+    <div class="info-row">
+      <span>判定ステータス:</span>
+      <div>
+        <span id="info-status" class="info-val">-</span>
+        <button type="button" id="btn-status-change" class="btn-change-status" style="display:none;" onclick="changeStatusToOrderingFromCard()">🛒 注文中に変更</button>
+      </div>
+    </div>
   </div>
   
   <!-- 入力フォームエリア -->
@@ -358,7 +376,7 @@
   // 【重要】ご自身のGASウェブアプリURL（末尾が /exec のURL）を貼り付けます！
   // 例: const GAS_API_URL = "https://script.google.com/macros/s/XXXXX/exec";
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzrQynqzrIVZkMCmSr_OAufuF7dGITrmVYeitRzWE3aGvpSYWyq0YReevt_W0yHPTfpzg/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyb8M6CrwQ-VeHfCf9caYpbaVPGIcAqjKciYj51zwkOcqQ1qxEjkVt14ml0xBfrm2OS_Q/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -367,6 +385,7 @@
   let isApiCalling = false;
   let isScanProcessing = false;
   let isWarningListLoaded = false;
+  let currentSearchedPartNo = "";
 
   /**
    * 要注文・注文中リストの開閉とオンデマンド読み込み
@@ -401,14 +420,20 @@
         
         let html = "";
         res.list.forEach(item => {
-          const tagClass = item.status === "注文中" ? "tag-ordering" : "tag-alert";
+          const isOrdering = item.status === "注文中";
+          const tagClass = isOrdering ? "tag-ordering" : "tag-alert";
+          const changeBtn = !isOrdering ? `<button type="button" class="btn-change-status" onclick="event.stopPropagation(); changeStatusToOrdering('${item.partNo}')">🛒 注文中に変更</button>` : "";
+          
           html += `
             <div class="warning-item" onclick="selectWarningItem('${item.partNo}')" style="cursor:pointer;">
               <div>
                 <strong>${item.partNo}</strong><br>
                 <span style="color:#777; font-size:0.8rem;">現在庫: ${item.stock} / 最低: ${item.min}</span>
               </div>
-              <div><span class="${tagClass}">${item.status}</span></div>
+              <div style="display:flex; align-items:center;">
+                <span class="${tagClass}">${item.status}</span>
+                ${changeBtn}
+              </div>
             </div>
           `;
         });
@@ -419,6 +444,34 @@
     }, function(err) {
       container.innerHTML = "<div style='color:red; font-size:0.85rem;'>通信エラーが発生しました</div>";
     });
+  }
+
+  function changeStatusToOrdering(partNo) {
+    if (isApiCalling) return;
+    if (!confirm(`${partNo} のステータスを「注文中」に変更しますか？`)) return;
+    
+    isApiCalling = true;
+    showLoading(true);
+    callGasApi("updateStatus", { partNo: partNo }, function(res) {
+      showLoading(false);
+      alert(res.message);
+      if (res.success) {
+        isWarningListLoaded = false;
+        fetchWarningList();
+        if (currentSearchedPartNo === partNo) {
+          triggerSearch();
+        }
+      }
+    }, function(err) {
+      showLoading(false);
+      alert("ステータス更新エラー: " + err);
+    });
+  }
+
+  function changeStatusToOrderingFromCard() {
+    if (currentSearchedPartNo) {
+      changeStatusToOrdering(currentSearchedPartNo);
+    }
   }
 
   function selectWarningItem(partNo) {
@@ -482,6 +535,8 @@
           google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).linkJanToPart(payload);
         } else if (action === "warningList") {
           google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).getWarningList();
+        } else if (action === "updateStatus") {
+          google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).updateStatusToOrdering(payload);
         }
         return;
       } else {
@@ -531,7 +586,7 @@
         try {
           val = decodeURIComponent(match[1]).replace(/ /g, ' ').trim();
         } catch(err) {
-          val = match[1].replace(/ /g, ' ').trim();
+          val = match[1].replace(/g, ' ').trim();
         }
       }
     } else {
@@ -566,7 +621,7 @@
         try {
           keyword = decodeURIComponent(match[1]).replace(/ /g, ' ').trim();
         } catch(err) {
-          keyword = match[1].replace(/t/g, ' ').trim();
+          keyword = match[1].replace(/g, ' ').trim();
         }
         document.getElementById('search-input').value = keyword;
       }
@@ -579,23 +634,27 @@
     callGasApi("search", keyword, function(result) {
       showLoading(false);
       if (result.success) {
+        currentSearchedPartNo = result.partNo;
         document.getElementById('info-partno').innerText = result.partNo;
         document.getElementById('info-use').innerText = result.use;
         document.getElementById('info-stock').innerText = result.currentStock;
         document.getElementById('info-min').innerText = result.minStock;
         
         const statusEl = document.getElementById('info-status');
-        if (Number(result.currentStock) <= Number(result.minStock)) {
-          if (statusEl.innerText === "注文中") {
-            statusEl.innerText = "注文中";
-            statusEl.className = "info-val status-ordering";
-          } else {
-            statusEl.innerText = "要注文";
-            statusEl.className = "info-val status-alert";
-          }
+        const statusBtn = document.getElementById('btn-status-change');
+        
+        if (result.status === "注文中") {
+          statusEl.innerText = "注文中";
+          statusEl.className = "info-val status-ordering";
+          statusBtn.style.display = "none";
+        } else if (Number(result.currentStock) <= Number(result.minStock)) {
+          statusEl.innerText = "要注文";
+          statusEl.className = "info-val status-alert";
+          statusBtn.style.display = "inline-block";
         } else {
           statusEl.innerText = "在庫あり";
           statusEl.className = "info-val status-ok";
+          statusBtn.style.display = "none";
         }
         
         document.getElementById('input-price').value = result.price !== undefined ? result.price : "";
@@ -604,9 +663,11 @@
         document.getElementById('input-qty').focus();
         document.getElementById('input-qty').select();
       } else if (result.notFound) {
+        currentSearchedPartNo = "";
         document.getElementById('link-jan').value = result.jan;
         document.getElementById('link-partno').value = "";
         document.getElementById('link-price').value = "";
+        document.getElementById('btn-status-change').style.display = "none";
         
         document.getElementById('unregistered-panel').style.display = 'block';
         document.getElementById('link-partno').focus();
@@ -864,7 +925,7 @@
       alert(result.message);
       if (result.success) {
         resetForm();
-        isWarningListLoaded = false; // 次回リストを開いた時に最新状態を再取得
+        isWarningListLoaded = false;
       }
     }, function(err) {
       showLoading(false);
@@ -881,10 +942,12 @@
     document.getElementById('info-min').innerText = "-";
     document.getElementById('info-status').innerText = "-";
     document.getElementById('info-status').className = "info-val";
+    document.getElementById('btn-status-change').style.display = "none";
     document.getElementById('unregistered-panel').style.display = 'none';
     
     document.getElementById('link-partno').value = "";
     document.getElementById('link-price').value = "";
+    currentSearchedPartNo = "";
     
     setCategory('購入');
     currentMasterPrice = null;
