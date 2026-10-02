@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.20</title>
+  <title>工具管理 Ver4.21</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -223,7 +223,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.20</h2>
+  <h2>工具管理 Ver4.21</h2>
   
   <!-- 動画スキャン専用ボタン -->
   <div class="camera-btn-group">
@@ -376,7 +376,7 @@
   // 【重要】ご自身のGASウェブアプリURL（末尾が /exec のURL）を貼り付けます！
   // 例: const GAS_API_URL = "https://script.google.com/macros/s/XXXXX/exec";
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyb8M6CrwQ-VeHfCf9caYpbaVPGIcAqjKciYj51zwkOcqQ1qxEjkVt14ml0xBfrm2OS_Q/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz4uikR2DQ70YdmNFV2VYTpLGDkW60h569ENhCd8rNdVL9IZl6HEUDhTupdOtU9ytNjww/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -586,7 +586,7 @@
         try {
           val = decodeURIComponent(match[1]).replace(/ /g, ' ').trim();
         } catch(err) {
-          val = match[1].replace(/g, ' ').trim();
+          val = match[1].replace(/ /g, ' ').trim();
         }
       }
     } else {
@@ -621,7 +621,7 @@
         try {
           keyword = decodeURIComponent(match[1]).replace(/ /g, ' ').trim();
         } catch(err) {
-          keyword = match[1].replace(/g, ' ').trim();
+          keyword = match[1].replace(/ /g, ' ').trim();
         }
         document.getElementById('search-input').value = keyword;
       }
