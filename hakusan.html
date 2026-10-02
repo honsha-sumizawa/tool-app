@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理_白山 Ver4.16</title>
+  <title>工具管理_白山 Ver4.17</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -21,10 +21,9 @@
     .search-box input { flex: 1; }
     .btn-search { background: #3498db; color: white; border: none; padding: 0 16px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
     
-    /* カメラボタン群 */
-    .camera-btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
-    .btn-camera-live { flex: 1; background: #2ecc71; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
-    .btn-camera-native { flex: 1; background: #9b59b6; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; text-align: center; }
+    /* 動画スキャン専用全幅ボタン */
+    .camera-btn-group { margin-bottom: 12px; }
+    .btn-camera-live { width: 100%; background: #2ecc71; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
 
     /* カメラ表示エリア */
     #camera-area {
@@ -174,17 +173,13 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理_白山 Ver4.16</h2>
+  <h2>工具管理_白山 Ver4.17</h2>
   
-  <!-- 2つのカメラ選択ボタン -->
+  <!-- 動画スキャン専用ボタン -->
   <div class="camera-btn-group">
     <button type="button" class="btn-camera-live" onclick="initCamera()">
       📷 動画スキャン (バーコード/QR)
     </button>
-    <label class="btn-camera-native">
-      📸 標準カメラ撮影
-      <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleNativeCamera(this)">
-    </label>
   </div>
   
   <!-- スキャナーガイド枠付き動画カメラ領域 -->
@@ -281,18 +276,24 @@
       </select>
     </div>
 
-    <!-- 所属工場 選択エリア -->
-    <div class="form-group">
-      <label for="select-factory">所属工場</label>
-      <select id="select-factory" onchange="updateMachineOptions()">
-        <option value="白山工場">白山工場</option>
-      </select>
-    </div>
-
     <!-- 白山工場 使用機械選択エリア -->
     <div class="form-group">
       <label for="select-machine">使用機械</label>
       <select id="select-machine">
+        <option value="指定なし">指定なし</option>
+        <option value="白山_XT-8">XT-8</option>
+        <option value="白山_X-180">X-180</option>
+        <option value="白山_XC-100(P)">XC-100(P)</option>
+        <option value="白山_XC-100(C)">XC-100(C)</option>
+        <option value="白山_XC-100">XC-100</option>
+        <option value="白山_XT-6">XT-6</option>
+        <option value="白山_XL-150">XL-150</option>
+        <option value="白山_X-10">X-10</option>
+        <option value="白山_ポリゴン">ポリゴン</option>
+        <option value="白山_MB-66">MB-66</option>
+        <option value="白山_ABパレ">ABパレ</option>
+        <option value="白山_Cパレ">Cパレ</option>
+        <option value="白山_ブラザー">ブラザー</option>
       </select>
     </div>
     
@@ -311,7 +312,7 @@
   // 【重要】スプレッドシート「工具管理 白山」からデプロイした
   // 白山工場用GASのウェブアプリURL（末尾が /exec のURL）を貼り付けます！
   // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzxMv-Qf63t8tP7H5JgphdYh80seKqytxwzEQx8XK6_fQJIhy3hnxZPa4fD0OyHJzmBhA/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwysh01mt9XytP_be5k4LZToeLN35Du717fIK6TghH1iBjU85e1MhYvz3zL3AWx5M8f5Q/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -319,46 +320,6 @@
   let qrScanInterval = null;
   let isApiCalling = false;
   let isScanProcessing = false;
-
-  // 白山工場の使用機械マップ（統合ダッシュボード対応用に 白山_ プレフィックス付き）
-  const machineMap = {
-    "白山工場": [
-      { val: "指定なし", label: "指定なし" },
-      { val: "白山_XT-8", label: "XT-8" },
-      { val: "白山_X-180", label: "X-180" },
-      { val: "白山_XC-100(P)", label: "XC-100(P)" },
-      { val: "白山_XC-100(C)", label: "XC-100(C)" },
-      { val: "白山_XC-100", label: "XC-100" },
-      { val: "白山_XT-6", label: "XT-6" },
-      { val: "白山_XL-150", label: "XL-150" },
-      { val: "白山_X-10", label: "X-10" },
-      { val: "白山_ポリゴン", label: "ポリゴン" },
-      { val: "白山_MB-66", label: "MB-66" },
-      { val: "白山_ABパレ", label: "ABパレ" },
-      { val: "白山_Cパレ", label: "Cパレ" },
-      { val: "白山_ブラザー", label: "ブラザー" }
-    ]
-  };
-
-  /**
-   * 白山工場の使用機械ドロップダウン更新
-   */
-  function updateMachineOptions() {
-    const factory = document.getElementById('select-factory').value;
-    const machineSelect = document.getElementById('select-machine');
-    machineSelect.innerHTML = "";
-    
-    const options = machineMap[factory] || machineMap["白山工場"];
-    options.forEach(opt => {
-      const el = document.createElement('option');
-      el.value = opt.val;
-      el.innerText = opt.label;
-      machineSelect.appendChild(el);
-    });
-  }
-
-  // 初期化時に白山工場の機械リストをセット
-  updateMachineOptions();
 
   /**
    * JANコード誤読判定（日本のJAN規格 45/49開始かつ 8/13桁の場合のみチェックデジット判定）
@@ -548,59 +509,6 @@
     });
   }
 
-  function handleNativeCamera(input) {
-    if (!input.files || !input.files[0]) return;
-    
-    showLoading(true);
-    const file = input.files[0];
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
-      const img = new Image();
-      img.onload = function() {
-        const canvas = document.getElementById('qr-canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
-
-        if (qrCode && qrCode.data) {
-          showLoading(false);
-          input.value = "";
-          document.getElementById('search-input').value = qrCode.data;
-          triggerSearch();
-          return;
-        }
-
-        Quagga.decodeSingle({
-          src: e.target.result,
-          numOfWorkers: 0,
-          decoder: { readers: ["ean_reader", "ean_8_reader", "code_128_reader", "code_39_reader"] },
-          locate: true
-        }, function(result) {
-          showLoading(false);
-          input.value = "";
-          
-          if (result && result.codeResult && result.codeResult.code) {
-            const rawCode = result.codeResult.code;
-            if (isInvalidJANScan(rawCode)) {
-              alert("バーコードの誤読を検出しました。再撮影してください。");
-              return;
-            }
-            document.getElementById('search-input').value = rawCode;
-            triggerSearch();
-          } else {
-            alert("バーコード/QRコードが識別できませんでした。離れた位置からズームして撮影してみてください。");
-          }
-        });
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  }
-
   function applyCameraZoom(val) {
     document.getElementById('zoom-val').innerText = parseFloat(val).toFixed(1) + "x";
     const video = document.getElementById('video');
@@ -755,13 +663,13 @@
       if(result && result.codeResult && result.codeResult.code) {
         const rawCode = result.codeResult.code;
         if (isInvalidJANScan(rawCode)) {
-          alert("バーコードの誤読を検出しました。「📸 標準カメラ撮影」でお試しください。");
+          alert("バーコードの誤読を検出しました。もう一度スキャンしてください。");
           return;
         }
         document.getElementById('search-input').value = rawCode;
         triggerSearch();
       } else {
-        alert("バーコード/QRコードを認識できませんでした。「📸 標準カメラ撮影」をお試しください。");
+        alert("バーコード/QRコードを認識できませんでした。対象をガイド枠中央に合わせてお試しください。");
       }
     });
   }
@@ -864,8 +772,6 @@
     document.getElementById('link-price').value = "";
     
     setCategory('購入');
-    document.getElementById('select-factory').value = "白山工場";
-    updateMachineOptions();
     currentMasterPrice = null;
     document.getElementById('search-input').focus();
   }
