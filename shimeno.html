@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理_示野 Ver4.21</title>
+  <title>工具管理（示野）Ver4.22</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -21,11 +21,9 @@
     .search-box input { flex: 1; }
     .btn-search { background: #3498db; color: white; border: none; padding: 0 16px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
     
-    /* 動画スキャン専用全幅ボタン */
     .camera-btn-group { margin-bottom: 12px; }
     .btn-camera-live { width: 100%; background: #2ecc71; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
 
-    /* カメラ表示エリア */
     #camera-area {
       display: none;
       margin-bottom: 14px;
@@ -50,7 +48,6 @@
       transition: transform 0.1s ease;
     }
 
-    /* ズームスライダーコントロール */
     .zoom-control-box {
       background: #111;
       padding: 8px 12px;
@@ -68,7 +65,6 @@
       cursor: pointer;
     }
 
-    /* ガイド枠 */
     .scan-overlay {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 260px;
@@ -128,7 +124,6 @@
     .status-alert { color: #e74c3c; font-weight: bold; }
     .status-ordering { color: #e67e22; font-weight: bold; }
 
-    /* 要注文・注文中アコーディオンリスト */
     .warning-accordion {
       margin-bottom: 14px;
       border: 2px solid #e74c3c;
@@ -177,7 +172,6 @@
       margin-left: 6px;
     }
 
-    /* 区分（購入 / 中古）切替トグルUI */
     .category-toggle {
       display: flex;
       gap: 8px;
@@ -214,25 +208,22 @@
     #loading { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; color:white; font-size:1.5rem; font-weight:bold; z-index:9999; }
   </style>
   
-  <!-- バーコード解析Quagga2 ＆ QRコード解析jsQR -->
-  <script src="[https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js](https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js)"></script>
-  <script src="[https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js](https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js)"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
 <body>
 
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理_示野 Ver4.21</h2>
+  <h2>工具管理（示野）Ver4.22</h2>
   
-  <!-- 動画スキャン専用ボタン -->
   <div class="camera-btn-group">
     <button type="button" class="btn-camera-live" onclick="initCamera()">
       📷 動画スキャン (バーコード/QR)
     </button>
   </div>
   
-  <!-- スキャナーガイド枠付き動画カメラ領域 -->
   <div id="camera-area">
     <div id="video-wrapper">
       <video id="video" autoplay playsinline muted></video>
@@ -243,7 +234,6 @@
         <div class="scan-tip">バーコードまたはQRコードをかざすと自動読み取りされます</div>
       </div>
     </div>
-    <!-- ズームコントロールバー -->
     <div class="zoom-control-box">
       <span>🔍 ズーム:</span>
       <input type="range" id="zoom-range" class="zoom-slider" min="1.0" max="4.0" step="0.1" value="1.0" oninput="applyCameraZoom(this.value)">
@@ -252,7 +242,6 @@
     <button type="button" class="btn-snap" onclick="captureLiveImage()">📸 現在のフレームを解析</button>
   </div>
   
-  <!-- 要注文・注文中アイテムリスト（アコーディオン） -->
   <div class="warning-accordion">
     <div class="warning-header" onclick="toggleWarningList()">
       <span>⚠️ 要注文・注文中リスト</span>
@@ -263,7 +252,6 @@
     </div>
   </div>
 
-  <!-- 未登録JAN/EDPコードの登録パネル -->
   <div id="unregistered-panel">
     <h3>⚠ 未登録JAN/EDPコードの登録</h3>
     <div class="form-group">
@@ -283,7 +271,6 @@
     </button>
   </div>
   
-  <!-- 検索入力エリア -->
   <div class="form-group">
     <label for="search-input">JAN / 品番 / EDP / QRコード</label>
     <div class="search-box">
@@ -292,7 +279,6 @@
     </div>
   </div>
   
-  <!-- 工具情報確認カード -->
   <div class="info-card">
     <div class="info-row"><span>品番:</span><span id="info-partno" class="info-val">-</span></div>
     <div class="info-row"><span>用途:</span><span id="info-use" class="info-val">-</span></div>
@@ -306,9 +292,7 @@
     </div>
   </div>
   
-  <!-- 入力フォームエリア -->
   <form id="manager-form" onsubmit="return false;">
-    <!-- 区分（購入 / 中古）切替エリア -->
     <div class="form-group">
       <label>入出庫区分</label>
       <div class="category-toggle">
@@ -327,34 +311,37 @@
       <input type="number" id="input-qty" min="1" value="1">
     </div>
     
-    <!-- 示野工場 使用者選択エリア -->
     <div class="form-group">
       <label for="select-user">使用者</label>
       <select id="select-user">
-        <option value="相良">相良</option>
-        <option value="健太郎">健太郎</option>
-        <option value="中谷">中谷</option>
-        <option value="飯田">飯田</option>
-        <option value="ファイド">ファイド</option>
-        <option value="浜崎">浜崎</option>
-        <option value="ハニフ">ハニフ</option>
+        <option value="徳中">徳中</option>
+        <option value="岡部">岡部</option>
+        <option value="鍛冶">鍛冶</option>
+        <option value="石崎">石崎</option>
+        <option value="松浦">松浦</option>
+        <option value="カデル">カデル</option>
+        <option value="ラホマン">ラホマン</option>
+        <option value="上田">上田</option>
       </select>
     </div>
 
-    <!-- 示野工場 使用機械選択エリア -->
     <div class="form-group">
       <label for="select-machine">使用機械</label>
       <select id="select-machine">
         <option value="指定なし">指定なし</option>
-        <option value="示野_0(NLX-1500)">0(NLX-1500)</option>
-        <option value="示野_1(ミヤノ)">1(ミヤノ)</option>
-        <option value="示野_2(ミヤノ)">2(ミヤノ)</option>
-        <option value="示野_3(ミヤノ)">3(ミヤノ)</option>
-        <option value="示野_4(XL-150)">4(XL-150)</option>
-        <option value="示野_5(XL-150)">5(XL-150)</option>
-        <option value="示野_6(XL-150)">6(XL-150)</option>
-        <option value="示野_7(XL-150)">7(XL-150)</option>
-        <option value="示野_8(XT-8MY)">8(XT-8MY)</option>
+        <option value="NTX①">NTX①</option>
+        <option value="NTX②">NTX②</option>
+        <option value="XT-8MY">XT-8MY</option>
+        <option value="NLXS">NLXS</option>
+        <option value="NLX">NLX</option>
+        <option value="X-180">X-180</option>
+        <option value="XC-100">XC-100</option>
+        <option value="X-100_1A">X-100_1A</option>
+        <option value="X-100_2A">X-100_2A</option>
+        <option value="X-150_2A">X-150_2A</option>
+        <option value="X-10">X-10</option>
+        <option value="ミニターン">ミニターン</option>
+        <option value="デュラターン">デュラターン</option>
       </select>
     </div>
     
@@ -365,15 +352,11 @@
   </form>
 </div>
 
-<!-- Canvas作業用隠し要素 -->
 <canvas id="qr-canvas" style="display:none;"></canvas>
 
 <script>
-  // =========================================================================
-  // 【重要】スプレッドシート「工具管理 示野」からデプロイした
-  // 示野工場用GASのウェブアプリURL（末尾が /exec のURL）を貼り付けます！
-  // =========================================================================
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwDamtzcOi6gXFtonP_8nNzKdwg47vOqniiNx_RRtOAM-ssQ8d3h3B-YEkMr3w--4IN/exec"; 
+  // 示野工場のスプレッドシートからデプロイしたWebアプリURL
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzIsg48juGqFH_wqzZRVEOd_eilN2ugp_mrczJfFYSM4TapmhlOnT-d-bEdSrRSmyNM/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -384,9 +367,6 @@
   let isWarningListLoaded = false;
   let currentSearchedPartNo = "";
 
-  /**
-   * 要注文・注文中リストの開閉とオンデマンド読み込み
-   */
   function toggleWarningList() {
     const body = document.getElementById('warning-body');
     const icon = document.getElementById('warning-toggle-icon');
@@ -478,9 +458,6 @@
     document.getElementById('warning-toggle-icon').innerText = "▼ タップで確認";
   }
 
-  /**
-   * JANコード誤読判定（日本のJAN規格 45/49開始かつ 8/13桁の場合のみチェックデジット判定）
-   */
   function isInvalidJANScan(codeStr) {
     if (!/^\d+$/.test(codeStr)) return false;
     
@@ -518,11 +495,8 @@
     }
   }
 
-  /**
-   * 自動リトライ機能付き API 通信関数（TypeError: Load failed 対策）
-   */
   function callGasApi(action, payload, successCallback, failureCallback, retryCount = 1) {
-    if (GAS_API_URL === "XXXXX") {
+    if (GAS_API_URL.includes("【示野工場のウェブアプリURL】")) {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         if (action === "search") {
           google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).searchTool(payload);
@@ -537,7 +511,7 @@
         }
         return;
       } else {
-        alert("【設定エラー】コード上部の 'GAS_API_URL' に示野工場用GASのウェブアプリ URL を貼り付けてください。");
+        alert("【設定エラー】HTML内の 'GAS_API_URL' に示野工場のウェブアプリ URL を貼り付けてください。");
         showLoading(false);
         isApiCalling = false;
         return;
@@ -581,7 +555,7 @@
       const match = val.match(/entry\.\d+=([^&]+)/);
       if (match && match[1]) {
         try {
-          val = decodeURIComponent(match[1]).replace(/{g, ' ').trim();
+          val = decodeURIComponent(match[1]).replace(/ /g, ' ').trim();
         } catch(err) {
           val = match[1].replace(/ /g, ' ').trim();
         }
