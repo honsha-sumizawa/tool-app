@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理（示野）Ver4.22</title>
+  <title>工具管理 Ver4.23 (示野工場)</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -216,7 +216,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理（示野）Ver4.22</h2>
+  <h2>工具管理 Ver4.23 (示野)</h2>
   
   <div class="camera-btn-group">
     <button type="button" class="btn-camera-live" onclick="initCamera()">
@@ -351,7 +351,7 @@
 
 <script>
   // 示野工場のスプレッドシートからデプロイしたWebアプリURL
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwFGetwvTTcBvWOvxrue-PJKfS8tchC8l5tDJJ-AEHKCk-6GrLLiX_CW4dlWVY9htLX/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwjiWRQ2pTfGlScOfm5k1F6ajMFxlbHN25g79Aitu9INJFpYMBcKFikwR3INBrBOhbi/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -490,20 +490,32 @@
     }
   }
 
-  function callGasApi(action, payload, successCallback, failureCallback, retryCount = 1) {
+  function callGasApi(action, payload, successCallback, failureCallback, retryCount = 3) {
     if (GAS_API_URL.includes("【示野工場のウェブアプリURL】")) {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
-        if (action === "search") {
-          google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).searchTool(payload);
-        } else if (action === "register") {
-          google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).registerData(payload);
-        } else if (action === "link") {
-          google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).linkJanToPart(payload);
-        } else if (action === "warningList") {
-          google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).getWarningList();
-        } else if (action === "updateStatus") {
-          google.script.run.withSuccessHandler(successCallback).withFailureHandler(failureCallback).updateStatusToOrdering(payload);
-        }
+        const runRetry = (retriesLeft) => {
+          let runner = google.script.run
+            .withSuccessHandler((res) => {
+              isApiCalling = false;
+              successCallback(res);
+            })
+            .withFailureHandler((err) => {
+              if (retriesLeft > 1) {
+                console.warn(`GAS実行エラー(${action})。自動再通信します...残り${retriesLeft - 1}回`, err);
+                setTimeout(() => runRetry(retriesLeft - 1), 1000);
+              } else {
+                isApiCalling = false;
+                failureCallback(err);
+              }
+            });
+
+          if (action === "search") runner.searchTool(payload);
+          else if (action === "register") runner.registerData(payload);
+          else if (action === "link") runner.linkJanToPart(payload);
+          else if (action === "warningList") runner.getWarningList();
+          else if (action === "updateStatus") runner.updateStatusToOrdering(payload);
+        };
+        runRetry(retryCount);
         return;
       } else {
         alert("【設定エラー】HTML内の 'GAS_API_URL' に示野工場のウェブアプリ URL を貼り付けてください。");
@@ -532,8 +544,8 @@
       successCallback(data);
     })
     .catch(err => {
-      if (retryCount > 0 && (err.name === 'TypeError' || err.message.includes('Load failed') || err.message.includes('Failed to fetch'))) {
-        console.warn("通信エラーを検知。1秒後に再試行します...", err);
+      if (retryCount > 1) {
+        console.warn(`通信エラー(${action})。1秒後に自動再試行します...残り${retryCount - 1}回`, err);
         setTimeout(() => {
           callGasApi(action, payload, successCallback, failureCallback, retryCount - 1);
         }, 1000);
