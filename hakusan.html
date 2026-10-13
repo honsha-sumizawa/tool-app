@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.27 (白山)</title>
+  <title>工具管理 Ver4.28 (白山)</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -48,7 +48,7 @@
     .scan-tip { position: absolute; bottom: 6px; width: 100%; text-align: center; color: #fff; font-size: 0.8rem; font-weight: bold; text-shadow: 0 1px 2px #000; }
     .btn-snap { width: 100%; background: #e74c3c; color: white; border: none; padding: 10px; font-size: 0.95rem; font-weight: bold; cursor: pointer; }
 
-    /* 3タップ選択パネル */
+    /* 動的3タップ選択パネル */
     .quick-panel {
       margin-bottom: 14px; border: 2px solid #3498db; border-radius: 8px; overflow: hidden; background: #fdfefe;
     }
@@ -122,7 +122,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.27 (白山)</h2>
+  <h2>工具管理 Ver4.28 (白山)</h2>
   
   <!-- 1. カメラ動画スキャンエリア -->
   <div class="camera-btn-group">
@@ -158,22 +158,17 @@
     </div>
   </div>
 
-  <!-- 3. クイック選択パネル（3タップ選択UI） -->
+  <!-- 3. 動的3タップ選択パネル（マスタ自動解析連携） -->
   <div class="quick-panel">
     <div class="quick-header" onclick="toggleQuickPanel()">
-      <span>📋 主要チップ 3タップ選択</span>
+      <span>📋 主要チップ 3タップ選択 (動的解析)</span>
       <span id="quick-toggle-icon">▼ タップで展開</span>
     </div>
     <div id="quick-body" class="quick-body">
       <!-- ステップ1: 用途 -->
       <div class="quick-step-title">① 用途を選択</div>
       <div class="quick-btn-grid" id="grid-use">
-        <div class="quick-btn" onclick="selectQuickUse('外径荒')">外径 荒</div>
-        <div class="quick-btn" onclick="selectQuickUse('外径仕上')">外径 仕上</div>
-        <div class="quick-btn" onclick="selectQuickUse('内径荒')">内径 荒</div>
-        <div class="quick-btn" onclick="selectQuickUse('内径仕上')">内径 仕上</div>
-        <div class="quick-btn" onclick="selectQuickUse('突っ切り')">突っ切り</div>
-        <div class="quick-btn" onclick="selectQuickUse('ねじ切り')">ねじ切り</div>
+        <div style="grid-column: span 3; color: #7f8c8d; font-size: 0.85rem; text-align: center; padding: 8px;">マスタデータ解析中...</div>
       </div>
 
       <!-- ステップ2: ノーズR / 諸元 -->
@@ -182,9 +177,9 @@
         <div class="quick-btn-grid" id="grid-spec"></div>
       </div>
 
-      <!-- ステップ3: メーカー / 材種 -->
+      <!-- ステップ3: 銘柄 / 材種 -->
       <div id="wrap-part" style="display:none;">
-        <div class="quick-step-title">③ メーカー・材種を選択して確定</div>
+        <div class="quick-step-title">③ 工具を選択して確定</div>
         <div class="quick-btn-grid" style="grid-template-columns: 1fr;" id="grid-part"></div>
       </div>
     </div>
@@ -300,7 +295,7 @@
 
 <script>
   // 白山工場のスプレッドシートからデプロイしたWebアプリURL
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyWbiq_4ctp7fsXO1IxoEsg_tj6q_r_0Bu0sz9YnOAL5qtTCeky3qkSxtmViXZ4qPiojQ/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzq23YqlXYyNnssZsOBkgcSbRYEQMWi-95Ivp7G0L5jxPinr57fycWNVGN3DWtyI_NXfg/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -310,11 +305,14 @@
   let isScanProcessing = false;
   let isWarningListLoaded = false;
   let currentSearchedPartNo = "";
+  let quickToolTree = null; // 動的ツリーキャッシュ
+  let selectedQuickUse = null;
 
-  // 会社端末用：起動時に検索欄へ自動フォーカス
+  // 会社端末用：起動時に検索欄へ自動フォーカス & 動的ツリー初期取得
   window.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('search-input');
     if (input) input.focus();
+    loadQuickTree();
   });
 
   // 全角英数記号の半角変換関数
@@ -335,73 +333,39 @@
     document.getElementById('input-qty').value = val;
   }
 
-  /* --- 3タップ選択パネル ロジック --- */
-  // 主要チップデータプリセット（マスタの実在品番に基づく定義）
-  const QUICK_DATA = {
-    '外径荒': {
-      '0.8R': [
-        { label: '京セラ CNMG120408GS (CA025P)', partNo: 'CNMG120408GS_CA025P' },
-        { label: '住友 CNMG120408N-EG (AC6030M)', partNo: 'CNMG120408N-EG_AC6030M' },
-        { label: '京セラ CNMG120408PQ (PV720)', partNo: 'CNMG120408PQ_PV720' },
-        { label: '三菱 CNMG120408-MH (MC6015)', partNo: 'CNMG120408-MH_MC6015' }
-      ],
-      '0.4R': [
-        { label: '京セラ CNGG120404AH (KW10)', partNo: 'CNGG120404AH_KW10' }
-      ]
-    },
-    '外径仕上': {
-      '0.4R': [
-        { label: '京セラ TNGG160404L-S (PV720)', partNo: 'TNGG160404L-S_PV720' },
-        { label: '京セラ TNGG160404L-S (TN620)', partNo: 'TNGG160404L-S_TN620' },
-        { label: '京セラ VNMG160404HQ (PV720)', partNo: 'VNMG160404HQ_PV720' }
-      ],
-      '0.8R': [
-        { label: '京セラ VNMG160408GP (PV7025)', partNo: 'VNMG160408GP_PV7025' },
-        { label: '京セラ TPMT110308GP (PR1725)', partNo: 'TPMT110308GP_PR1725' }
-      ]
-    },
-    '内径荒': {
-      '0.4R': [
-        { label: '京セラ TPMT110304HQ (PR1535)', partNo: 'TPMT110304HQ_PR1535' },
-        { label: '京セラ SCMT050205-GM-E (PR1535)', partNo: 'SCMT050205-GM-E_PR1535' }
-      ],
-      '0.8R': [
-        { label: '京セラ TPMT110308HQ (PR1535)', partNo: 'TPMT110308HQ_PR1535' }
-      ]
-    },
-    '内径仕上': {
-      '0.2R': [
-        { label: '京セラ WBET060102ML-F (PR1725)', partNo: 'WBET060102ML-F_PR1725' },
-        { label: '京セラ WBET080202ML-F (PV710)', partNo: 'WBET080202ML-F_PV710' }
-      ],
-      '0.4R': [
-        { label: '京セラ TPMT090204HQ (PR1535)', partNo: 'TPMT090204HQ_PR1535' },
-        { label: '京セラ WBMT060104L-DP (PR1725)', partNo: 'WBMT060104L-DP_PR1725' }
-      ]
-    },
-    '突っ切り': {
-      '3.0mm(主力)': [
-        { label: '京セラ GDM3020R-025PM-6D (PR1535)', partNo: 'GDM3020R-025PM-6D_PR1535' },
-        { label: '京セラ GDM3020N-020GM (PR1225)', partNo: 'GDM3020N-020GM_PR1225' }
-      ],
-      '2.0mm/2.5mm': [
-        { label: '京セラ GDG2520N-020GS (PR1535)', partNo: 'GDG2520N-020GS_PR1535' },
-        { label: '京セラ GVR200-020B (PR930)', partNo: 'GVR200-020B_PR930' }
-      ]
-    },
-    'ねじ切り': {
-      '外径(ER)': [
-        { label: '16ER 1.50ピッチ (PR1535)', partNo: '16ER150ISO-TQ_PR1535' },
-        { label: '16ER 14山ウィット (PR1215)', partNo: '16ER14W-TF_PR1215' }
-      ],
-      '内径(IR)': [
-        { label: '11IR 1.50ピッチ (PR1535)', partNo: '11IR150ISO-TQ_PR1535' },
-        { label: '11IR 19山管用テーパ (GW15)', partNo: '11IR19BSPT_GW15' }
-      ]
-    }
-  };
+  /* --- 動的3タップ選択パネル ロジック (マスタ自動解析連携) --- */
+  function loadQuickTree() {
+    callGasApi("quickTree", null, function(res) {
+      if (res && res.success && res.tree) {
+        quickToolTree = res.tree;
+        renderQuickUseButtons();
+      } else {
+        document.getElementById('grid-use').innerHTML = "<div style='grid-column: span 3; color: red; font-size: 0.8rem; text-align: center;'>マスタ解析データの読み込みに失敗しました</div>";
+      }
+    }, function(err) {
+      console.warn("クイックツリー取得失敗:", err);
+      document.getElementById('grid-use').innerHTML = "<div style='grid-column: span 3; color: red; font-size: 0.8rem; text-align: center;'>通信エラーのため選択肢を取得できません</div>";
+    });
+  }
 
-  let selectedQuickUse = null;
+  function renderQuickUseButtons() {
+    const gridUse = document.getElementById('grid-use');
+    gridUse.innerHTML = '';
+    const categories = Object.keys(quickToolTree || {});
+
+    if (categories.length === 0) {
+      gridUse.innerHTML = "<div style='grid-column: span 3; color: #777; font-size: 0.85rem; text-align: center;'>利用可能な工具分類がありません</div>";
+      return;
+    }
+
+    categories.forEach(cat => {
+      const btn = document.createElement('div');
+      btn.className = 'quick-btn';
+      btn.innerText = cat;
+      btn.onclick = () => selectQuickUse(cat, btn);
+      gridUse.appendChild(btn);
+    });
+  }
 
   function toggleQuickPanel() {
     const body = document.getElementById('quick-body');
@@ -412,14 +376,15 @@
     } else {
       body.style.display = 'block';
       icon.innerText = "▲ 閉じる";
+      if (!quickToolTree) loadQuickTree();
     }
   }
 
-  function selectQuickUse(useKey) {
+  function selectQuickUse(useKey, clickedEl) {
     selectedQuickUse = useKey;
     const btns = document.querySelectorAll('#grid-use .quick-btn');
     btns.forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    if (clickedEl) clickedEl.classList.add('active');
 
     const specWrap = document.getElementById('wrap-spec');
     const specGrid = document.getElementById('grid-spec');
@@ -428,28 +393,31 @@
     specGrid.innerHTML = '';
     partWrap.style.display = 'none';
 
-    const specs = Object.keys(QUICK_DATA[useKey] || {});
+    const specs = Object.keys(quickToolTree[useKey] || {});
+    // Rの小さい順、寸法の小さい順にソート
+    specs.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
     specs.forEach(sp => {
       const btn = document.createElement('div');
       btn.className = 'quick-btn';
       btn.innerText = sp;
-      btn.onclick = () => selectQuickSpec(sp);
+      btn.onclick = () => selectQuickSpec(sp, btn);
       specGrid.appendChild(btn);
     });
 
     specWrap.style.display = 'block';
   }
 
-  function selectQuickSpec(specKey) {
+  function selectQuickSpec(specKey, clickedEl) {
     const btns = document.querySelectorAll('#grid-spec .quick-btn');
     btns.forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    if (clickedEl) clickedEl.classList.add('active');
 
     const partWrap = document.getElementById('wrap-part');
     const partGrid = document.getElementById('grid-part');
     partGrid.innerHTML = '';
 
-    const parts = QUICK_DATA[selectedQuickUse][specKey] || [];
+    const parts = (quickToolTree[selectedQuickUse] && quickToolTree[selectedQuickUse][specKey]) || [];
     parts.forEach(item => {
       const btn = document.createElement('div');
       btn.className = 'quick-btn';
@@ -622,6 +590,7 @@
           else if (action === "link") runner.linkJanToPart(payload);
           else if (action === "warningList") runner.getWarningList();
           else if (action === "updateStatus") runner.updateStatusToOrdering(payload);
+          else if (action === "quickTree") runner.getQuickToolTree();
         };
         runRetry(retryCount);
         return;
