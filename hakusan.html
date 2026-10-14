@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.28 (白山)</title>
+  <title>工具管理 Ver4.29 (白山)</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -57,9 +57,10 @@
     }
     .quick-body { display: none; padding: 12px; }
     .quick-step-title { font-size: 0.82rem; font-weight: bold; color: #7f8c8d; margin-bottom: 6px; }
-    .quick-btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+    .quick-btn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; }
+    .quick-btn-grid.grid-spec { grid-template-columns: repeat(3, 1fr); }
     .quick-btn {
-      background: #ecf0f1; border: 1px solid #bdc3c7; padding: 10px 4px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; color: #2c3e50; cursor: pointer; text-align: center; transition: 0.15s;
+      background: #ecf0f1; border: 1px solid #bdc3c7; padding: 10px 4px; border-radius: 6px; font-size: 0.82rem; font-weight: bold; color: #2c3e50; cursor: pointer; text-align: center; transition: 0.15s;
     }
     .quick-btn:active, .quick-btn.active { background: #3498db; color: white; border-color: #2980b9; }
 
@@ -122,7 +123,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.28 (白山)</h2>
+  <h2>工具管理 Ver4.29 (白山)</h2>
   
   <!-- 1. カメラ動画スキャンエリア -->
   <div class="camera-btn-group">
@@ -158,23 +159,23 @@
     </div>
   </div>
 
-  <!-- 3. 動的3タップ選択パネル（マスタ自動解析連携） -->
+  <!-- 3. 動的3タップ選択パネル（マスタ全自動解析 ＆ 刃先角度/溝幅完全解析版） -->
   <div class="quick-panel">
     <div class="quick-header" onclick="toggleQuickPanel()">
       <span>📋 主要チップ 3タップ選択 (動的解析)</span>
       <span id="quick-toggle-icon">▼ タップで展開</span>
     </div>
     <div id="quick-body" class="quick-body">
-      <!-- ステップ1: 用途 -->
-      <div class="quick-step-title">① 用途を選択</div>
+      <!-- ステップ1: 用途 / 刃先角度 -->
+      <div class="quick-step-title">① 用途 / 刃先角度を選択</div>
       <div class="quick-btn-grid" id="grid-use">
-        <div style="grid-column: span 3; color: #7f8c8d; font-size: 0.85rem; text-align: center; padding: 8px;">マスタデータ解析中...</div>
+        <div style="grid-column: span 2; color: #7f8c8d; font-size: 0.85rem; text-align: center; padding: 8px;">マスタデータ解析中...</div>
       </div>
 
-      <!-- ステップ2: ノーズR / 諸元 -->
+      <!-- ステップ2: ノーズR / 溝幅 / ピッチ -->
       <div id="wrap-spec" style="display:none;">
-        <div class="quick-step-title">② ノーズR / 溝幅 / ピッチを選択</div>
-        <div class="quick-btn-grid" id="grid-spec"></div>
+        <div class="quick-step-title" id="spec-title">② ノーズR / 溝幅を選択</div>
+        <div class="quick-btn-grid grid-spec" id="grid-spec"></div>
       </div>
 
       <!-- ステップ3: 銘柄 / 材種 -->
@@ -295,7 +296,7 @@
 
 <script>
   // 白山工場のスプレッドシートからデプロイしたWebアプリURL
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzq23YqlXYyNnssZsOBkgcSbRYEQMWi-95Ivp7G0L5jxPinr57fycWNVGN3DWtyI_NXfg/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzEGyQ2HUt-7vxT2iInDmdv5lQoWpCtRA0g_bffpz6G84amf3Yb76HUi_2Lq-c0Z5t0Dg/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -305,7 +306,7 @@
   let isScanProcessing = false;
   let isWarningListLoaded = false;
   let currentSearchedPartNo = "";
-  let quickToolTree = null; // 動的ツリーキャッシュ
+  let quickToolTree = null;
   let selectedQuickUse = null;
 
   // 会社端末用：起動時に検索欄へ自動フォーカス & 動的ツリー初期取得
@@ -328,23 +329,22 @@
       .trim();
   }
 
-  // 数量プリセット設定
   function setQty(val) {
     document.getElementById('input-qty').value = val;
   }
 
-  /* --- 動的3タップ選択パネル ロジック (マスタ自動解析連携) --- */
+  /* --- 動的3タップ選択パネル ロジック (刃先角度/溝幅完全解析版) --- */
   function loadQuickTree() {
     callGasApi("quickTree", null, function(res) {
       if (res && res.success && res.tree) {
         quickToolTree = res.tree;
         renderQuickUseButtons();
       } else {
-        document.getElementById('grid-use').innerHTML = "<div style='grid-column: span 3; color: red; font-size: 0.8rem; text-align: center;'>マスタ解析データの読み込みに失敗しました</div>";
+        document.getElementById('grid-use').innerHTML = "<div style='grid-column: span 2; color: red; font-size: 0.8rem; text-align: center;'>マスタ解析データの読み込みに失敗しました</div>";
       }
     }, function(err) {
       console.warn("クイックツリー取得失敗:", err);
-      document.getElementById('grid-use').innerHTML = "<div style='grid-column: span 3; color: red; font-size: 0.8rem; text-align: center;'>通信エラーのため選択肢を取得できません</div>";
+      document.getElementById('grid-use').innerHTML = "<div style='grid-column: span 2; color: red; font-size: 0.8rem; text-align: center;'>通信エラーのため選択肢を取得できません</div>";
     });
   }
 
@@ -354,9 +354,32 @@
     const categories = Object.keys(quickToolTree || {});
 
     if (categories.length === 0) {
-      gridUse.innerHTML = "<div style='grid-column: span 3; color: #777; font-size: 0.85rem; text-align: center;'>利用可能な工具分類がありません</div>";
+      gridUse.innerHTML = "<div style='grid-column: span 2; color: #777; font-size: 0.85rem; text-align: center;'>利用可能な工具分類がありません</div>";
       return;
     }
+
+    // 表示優先順のソート
+    const priority = [
+      "外径 (80° C: CNMG等)",
+      "外径 (55° D: DNMG/DNGG等)",
+      "外径 (35° V: VNMG等)",
+      "外径 (三角形 T: TNMG/TNGG等)",
+      "内径",
+      "突っ切り・溝",
+      "逆引き (ABS/ABW)",
+      "オイルホール (SCMT/ZCMT)",
+      "外径ねじ",
+      "内径ねじ"
+    ];
+
+    categories.sort((a, b) => {
+      const idxA = priority.indexOf(a);
+      const idxB = priority.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
 
     categories.forEach(cat => {
       const btn = document.createElement('div');
@@ -389,13 +412,24 @@
     const specWrap = document.getElementById('wrap-spec');
     const specGrid = document.getElementById('grid-spec');
     const partWrap = document.getElementById('wrap-part');
+    const specTitle = document.getElementById('spec-title');
     
     specGrid.innerHTML = '';
     partWrap.style.display = 'none';
 
+    if (useKey.indexOf("突っ切り") !== -1) {
+      specTitle.innerText = "② 溝幅を選択";
+    } else if (useKey.indexOf("ねじ") !== -1) {
+      specTitle.innerText = "② ピッチ / 規格を選択";
+    } else if (useKey.indexOf("逆引き") !== -1) {
+      specTitle.innerText = "② 呼称サイズを選択";
+    } else {
+      specTitle.innerText = "② ノーズRを選択";
+    }
+
     const specs = Object.keys(quickToolTree[useKey] || {});
-    // Rの小さい順、寸法の小さい順にソート
-    specs.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    // 数値昇順ソート（0.33mm, 0.50mm, 1.00mm や R0.2, R0.4, R0.8 等）
+    specs.sort((a, b) => parseFloat(a.replace(/[^0-9\.]/g, '')) - parseFloat(b.replace(/[^0-9\.]/g, '')));
 
     specs.forEach(sp => {
       const btn = document.createElement('div');
