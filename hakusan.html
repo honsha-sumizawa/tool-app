@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工具管理 Ver4.29 (白山)</title>
+  <title>工具管理 Ver4.30 (白山)</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; color: #333; padding: 12px; }
@@ -123,7 +123,7 @@
 <div id="loading">処理中...</div>
 
 <div class="container">
-  <h2>工具管理 Ver4.29 (白山)</h2>
+  <h2>工具管理 Ver4.30 (白山)</h2>
   
   <!-- 1. カメラ動画スキャンエリア -->
   <div class="camera-btn-group">
@@ -296,7 +296,7 @@
 
 <script>
   // 白山工場のスプレッドシートからデプロイしたWebアプリURL
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzEGyQ2HUt-7vxT2iInDmdv5lQoWpCtRA0g_bffpz6G84amf3Yb76HUi_2Lq-c0Z5t0Dg/exec"; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwk7QnVUMyjwo1upTmc2eESAnc5tcI7eVX1qkhoiz9uZspyxqp92HwYCV0UjRH0lwissw/exec"; 
 
   let currentMasterPrice = null;
   let videoStream = null;
@@ -428,7 +428,7 @@
     }
 
     const specs = Object.keys(quickToolTree[useKey] || {});
-    // 数値昇順ソート（0.33mm, 0.50mm, 1.00mm や R0.2, R0.4, R0.8 等）
+    // 数値昇順ソート（0.33mm, 0.50mm, 1.00mm, 2.00mm や R0.2, R0.4, R0.8 等）
     specs.sort((a, b) => parseFloat(a.replace(/[^0-9\.]/g, '')) - parseFloat(b.replace(/[^0-9\.]/g, '')));
 
     specs.forEach(sp => {
@@ -457,7 +457,7 @@
       btn.className = 'quick-btn';
       btn.style.textAlign = 'left';
       btn.style.padding = '10px 12px';
-      btn.innerHTML = `<b>${item.label}</b><br><span style="font-size:0.75rem; color:#7f8c8d;">${item.partNo}</span>`;
+      btn.innerHTML = `<b>${item.label}</b><br><span style="font-size:0.75rem;color:#7f8c8d;">${item.partNo}</span>`;
       btn.onclick = () => {
         document.getElementById('search-input').value = item.partNo;
         triggerSearch();
